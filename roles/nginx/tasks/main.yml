@@ -1,0 +1,28 @@
+---
+- name: Atualizar o cache do apt
+  apt:
+    update_cache: yes
+
+- name: Instalar o nginx
+  apt:
+    name: nginx
+    state: latest
+
+- name: Configuração personalizada
+  template:
+    src: default.j2
+    dest: /etc/nginx/sites-enabled/default
+  notify: Reiniciar nginx
+
+- name: Copiar a página web
+  copy:
+    src: ./webpage/index.html
+    dest: /var/www/html/index.html
+    mode: '0644'
+
+- name: Garantir que o o nginx está a rodar
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
