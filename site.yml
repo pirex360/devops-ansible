@@ -2,6 +2,6 @@
 - name: Instalar o NGINX
   hosts: web
   become: yes
-  
+
   roles:
     - nginx

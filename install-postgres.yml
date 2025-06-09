@@ -1,0 +1,84 @@
+---
+- name: Instalar e configurar PostgreSQL 17.5
+  hosts: localhost
+  become: yes
+  vars:
+    pg_version: "17"
+    db_name: "devopsdb"
+    db_user: "devops"
+    db_password: "SenhaSegura123"
+    pg_data_dir: "/var/lib/pgsql/data"
+    pg_hba_file: "/var/lib/pgsql/data/pg_hba.conf"
+
+  tasks:
+    - name: Instalar PostgreSQL (Fedora/RHEL)
+      ansible.builtin.dnf:
+        name:
+          - "postgresql-server"
+          - "postgresql"
+        state: present
+
+    - name: Inicializar base de dados
+      ansible.builtin.command: /usr/bin/postgresql-setup --initdb
+      args:
+        creates: "{{ pg_data_dir }}/PG_VERSION"
+
+    - name: Alterar autenticação para md5 no pg_hba.conf (FEDORA Workaround)
+      ansible.builtin.replace:
+        path: "{{ pg_hba_file }}"
+        regexp: '^local\s+all\s+all\s+peer'
+        replace: "local   all             all                                     md5"
+
+    - name: Iniciar e habilitar serviço PostgreSQL
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Definir password para o utilizador postgres
+      become: true
+      become_user: postgres
+      ansible.builtin.command: >
+        psql -c "ALTER USER postgres WITH PASSWORD '{{ db_password }}';"
+
+    - name: Criar base de dados
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_user: postgres
+        login_password: "{{ db_password }}"
+        login_host: localhost
+        login_port: 5432
+
+    - name: Criar utilizador com password
+      community.postgresql.postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        role_attr_flags: "LOGIN"
+        state: present
+        login_user: postgres
+        login_password: "{{ db_password }}"
+        login_host: localhost
+        login_port: 5432
+
+    - name: Dar privilégio ao utilizador na DB
+      community.postgresql.postgresql_privs:
+        roles: "{{ db_user }}"
+        database: "{{ db_name }}"
+        privs: "ALL"
+        type: "database"
+        login_user: postgres
+        login_password: "{{ db_password }}"
+        login_host: localhost
+        login_port: 5432
+
+    - name: Testar conexão à BD
+      community.postgresql.postgresql_info:
+        login_user: devops
+        login_password: "{{ db_password }}"
+        login_host: localhost
+        login_db: "{{ db_name }}"
+      register: result
+
+    - debug:
+        var: result
